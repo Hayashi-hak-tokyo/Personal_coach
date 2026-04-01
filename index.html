@@ -78,7 +78,7 @@ export default function App() {
 
   // Gemini API呼び出し処理
   const generateAiResponse = async (userText, currentMessages) => {
-    const apiKey = ""; // 実行環境で提供されるキーを使用します
+    const apiKey = "AIzaSyCpEthYkeZ0b3Uv83SzM9tN49PZLYvVr9Y"; // 実行環境で提供されるキーを使用します
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
     // これまでの会話履歴をAPI用のフォーマットに変換
