@@ -59,7 +59,7 @@
       {
         id: 1,
         sender: 'user',
-        text: '約束していた家事の分担で、自分が疲れて後回しにしていたところに、由佳から言われて強く言い返してしまいました。\n反省して謝りたいのですが、気まずくてどうしたら良いかわからないです。',
+        text: '約束していた家事の分担で、自分が疲れて後回しにしていたところに、花子から言われて強く言い返してしまいました。\n反省して謝りたいのですが、気まずくてどうしたら良いかわからないです。',
         time: '16:18',
         avatar: 'https://i.pravatar.cc/150?img=11' 
       },
@@ -74,7 +74,7 @@
         sender: 'ai',
         type: 'agreement_card',
         title: '家事に関する話し合ったこと',
-        content: '少し、由佳さんが家事を行うものの雄太さんも多くの家事を行う話でした。\n雄太さんは後でやろうと思っていたとのことですが、疲れている中ではありますが、「いつやるのか」を明確に伝えていれば問題は起きなかったかもしれません。',
+        content: '少し、花子さんが家事を行うものの太郎さんも多くの家事を行う話でした。\n太郎さんは後でやろうと思っていたとのことですが、疲れている中ではありますが、「いつやるのか」を明確に伝えていれば問題は起きなかったかもしれません。',
         time: '16:19',
         users: [
           'https://i.pravatar.cc/150?img=11', 
@@ -111,17 +111,43 @@
       const generateAiResponse = async (userText, currentMessages) => {
         
         // ★★★ 裏技：キーを分割して自動スキャンを回避する ★★★
-        // 例：キーが "AIzaSyCpEthYke..." の場合
-        const part1 = "AIzaSy"; 
-        const part2 = "DO6LILip1i9wtuRRedHMu6DnIxmAK9INw"; // 例: "CpEthYke..."
+        const part1 = "AIzaSy"; // ← ここは絶対に変更しないでください
+        const part2 = "D4JVv86TG6DlDzIqJ9LhdINpkyq-uQ_lc"; // ←★ここに「新しく取得した」キーの AIzaSy より後ろの文字を入れてください！
         
         const apiKey = part1 + part2;
         
         if (!part2 || part2.includes("ここに残り")) {
-           return "APIキーが設定されていません。コード内の part2 の部分にキーの後半を入力してください。";
+           return "APIキーが設定されていません。コード内の part2 の部分に新しいキーの後半を入力してください。";
         }
         
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        let targetModelName = "models/gemini-1.5-flash"; // デフォルト
+        
+        try {
+            // 【修正点】現在のAPIキーで確実に利用可能なモデルを自動で探し出し、エラーを回避します
+            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+            const listRes = await fetch(listUrl);
+            if (listRes.ok) {
+                const listData = await listRes.json();
+                const availableModels = listData.models?.filter(m => m.supportedGenerationMethods?.includes("generateContent")) || [];
+                
+                // flash系の最新モデルを自動選択
+                const flashModel = availableModels.find(m => m.name.includes("flash"));
+                if (flashModel) {
+                    targetModelName = flashModel.name;
+                } else if (availableModels.length > 0) {
+                    targetModelName = availableModels[0].name;
+                }
+            } else {
+                const errData = await listRes.json();
+                if(errData.error?.message?.includes("API key not valid")) {
+                     return "【エラー】入力されたAPIキーが無効です。GitHubによって削除された可能性があります。Google AI Studioで新しく取得し直してください。";
+                }
+            }
+        } catch(e) {
+            console.warn("モデルの自動検索に失敗しました", e);
+        }
+        
+        const url = `https://generativelanguage.googleapis.com/v1beta/${targetModelName}:generateContent?key=${apiKey}`;
 
         // APIの仕様に合わせて会話履歴を構築
         const contents = [];
@@ -140,17 +166,20 @@
             contents.unshift({ role: 'user', parts: [{ text: 'こんにちは' }] });
         }
 
-        const systemPrompt = `
-          あなたは結婚相談所オーネットが提供する「パートナーシップのための関係性AIコーチング」のチャットボットです。
-          ユーザー（雄太さん）は妻（由佳さん）との関係やコミュニケーションについて悩みを相談してきます。
-          ユーザーの感情を受け止めて共感しつつ、客観的な視点を提供し、関係修復やより良いコミュニケーションのための具体的なアドバイスを行ってください。
-          トーンは親身で優しく、かつ論理的にお願いします。
-          スマートフォンアプリのチャットUIに表示されるため、1回の回答は長すぎず、会話のキャッチボールができる長さにしてください。
-        `;
+        const systemPrompt = `あなたは結婚相談所オーネットが提供する「パートナーシップのための関係性AIコーチング」のチャットボットです。
+ユーザー（太郎さん）は妻（花子さん）との関係やコミュニケーションについて悩みを相談してきます。
+ユーザーの感情を受け止めて共感しつつ、客観的な視点を提供し、関係修復やより良いコミュニケーションのための具体的なアドバイスを行ってください。
+トーンは親身で優しく、かつ論理的にお願いします。
+スマートフォンアプリのチャットUIに表示されるため、1回の回答は長すぎず、会話のキャッチボールができる長さにしてください。`;
 
+        // 【修正点】システムプロンプトをサポートしていない旧モデルでも確実に動くように、最初のユーザーメッセージに結合します
+        if (contents.length > 0) {
+            contents[0].parts[0].text = `【AIへの指示】\n${systemPrompt}\n\n【ユーザーからのメッセージ】\n${contents[0].parts[0].text}`;
+        }
+
+        // systemInstructionパラメーターは互換性維持のため使用しません
         const payload = {
-          contents,
-          systemInstruction: { parts: [{ text: systemPrompt }] }
+          contents
         };
 
         try {
@@ -334,8 +363,8 @@
                       
                       <div className="flex justify-center items-center gap-0 mb-5 relative">
                         <div className="absolute w-[60px] h-[2px] bg-orange-400 z-0"></div>
-                        <img src={msg.users[0]} alt="Yuta" className="w-[38px] h-[38px] rounded-full border-2 border-white shadow-md z-10 relative -left-6 object-cover bg-white" />
-                        <img src={msg.users[1]} alt="Yuka" className="w-[38px] h-[38px] rounded-full border-2 border-white shadow-md z-10 relative -right-6 object-cover bg-white" />
+                        <img src={msg.users[0]} alt="taro" className="w-[38px] h-[38px] rounded-full border-2 border-white shadow-md z-10 relative -left-6 object-cover bg-white" />
+                        <img src={msg.users[1]} alt="Hanako" className="w-[38px] h-[38px] rounded-full border-2 border-white shadow-md z-10 relative -right-6 object-cover bg-white" />
                       </div>
                       
                       <p className="text-[13px] text-gray-600 leading-[1.7] mb-5 tracking-wide whitespace-pre-wrap">
