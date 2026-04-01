@@ -1,390 +1,427 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Mic, Bot, Paperclip, ArrowUp, Menu } from 'lucide-react';
-
-// --- ランダムな日時候補を生成する関数 ---
-const generateRandomDates = () => {
-  const dates = [];
-  const now = new Date();
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIコーチング</title>
   
-  // 今日から1〜4日後のランダムな日時を3つ生成
-  const offsets = [1, 2, 3].map(val => val + Math.floor(Math.random() * 2));
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
   
-  offsets.forEach(offset => {
-    const d = new Date(now);
-    d.setDate(now.getDate() + offset);
-    d.setHours(Math.floor(Math.random() * 8) + 10); // 10時〜17時
-    const month = d.getMonth() + 1;
-    const date = d.getDate();
-    const day = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
-    const hours = d.getHours();
-    dates.push(`${month}月${date}日(${day}) ${hours}:00`);
-  });
-  return dates;
-};
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel (ブラウザ内でJSXを動かすため) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-// --- 初期モックデータ（画像の内容を再現） ---
-const initialMessages = [
-  {
-    id: 1,
-    sender: 'user',
-    text: '約束していた家事の分担で、自分が疲れて後回しにしていたところに、由佳から言われて強く言い返してしまいました。\n反省して謝りたいのですが、気まずくてどうしたら良いかわからないです。',
-    time: '16:18',
-    avatar: 'https://i.pravatar.cc/150?img=11' // 雄太のアバター
-  },
-  {
-    id: 2,
-    sender: 'ai',
-    text: 'なるほど、それは大変ですね。でも、仲良くする気持ちがあれば、解決は早いと思います。\nまずは、家事分担でどのようなことがこれまで話し合ったのか振り返りつつ、謝り方について考えましょう。',
-    time: '16:19'
-  },
-  {
-    id: 3,
-    sender: 'ai',
-    type: 'agreement_card',
-    title: '家事に関する話し合ったこと',
-    content: '少し、由佳さんが家事を行うものの雄太さんも多くの家事を行う話でした。\n雄太さんは後でやろうと思っていたとのことですが、疲れている中ではありますが、「いつやるのか」を明確に伝えていれば問題は起きなかったかもしれません。',
-    time: '16:19',
-    users: [
-      'https://i.pravatar.cc/150?img=11', // 雄太
-      'https://i.pravatar.cc/150?img=5'  // 由佳
-    ]
-  },
-  {
-    id: 4,
-    sender: 'ai',
-    text: '次は謝り方について考えますか？\nそれともアドバイザーと面談をしますか？',
-    time: '16:19',
-    actions: [
-      { label: '謝り方を考える', action: 'apologize' },
-      { label: 'アドバイザーと面談', action: 'advisor' }
-    ]
-  }
-];
+  <style>
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 0px;
+      background: transparent;
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
 
-export default function App() {
-  const [messages, setMessages] = useState(initialMessages);
-  const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef(null);
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
 
-  // 自動スクロール
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+    // --- アイコンコンポーネント (外部ライブラリ依存をなくすためSVGで直接定義) ---
+    const ChevronLeft = ({ size = 24, strokeWidth = 2, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="15 18 9 12 15 6"></polyline></svg>);
+    const Mic = ({ size = 24, strokeWidth = 2, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>);
+    const Bot = ({ size = 24, strokeWidth = 2, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg>);
+    const ArrowUp = ({ size = 24, strokeWidth = 2, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isTyping]);
-
-  // Gemini API呼び出し処理
-  const generateAiResponse = async (userText, currentMessages) => {
-    const apiKey = "AIzaSyCpEthYkeZ0b3Uv83SzM9tN49PZLYvVr9Y"; // 実行環境で提供されるキーを使用します
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-    // これまでの会話履歴をAPI用のフォーマットに変換
-    const contents = currentMessages
-      .filter(m => m.text) // カード要素などは除外
-      .map(m => ({
-        role: m.sender === 'user' ? 'user' : 'model',
-        parts: [{ text: m.text }]
-      }));
-
-    // 今回のユーザーの入力を追加
-    contents.push({ role: 'user', parts: [{ text: userText }] });
-
-    const systemPrompt = `
-      あなたは結婚相談所オーネットが提供する「パートナーシップのための関係性AIコーチング」のチャットボットです。
-      ユーザー（雄太さん）は妻（由佳さん）との関係やコミュニケーションについて悩みを相談してきます。
-      ユーザーの感情を受け止めて共感しつつ、客観的な視点を提供し、関係修復やより良いコミュニケーションのための具体的なアドバイスを行ってください。
-      トーンは親身で優しく、かつ論理的にお願いします。
-      スマートフォンアプリのチャットUIに表示されるため、1回の回答は長すぎず、会話のキャッチボールができる長さにしてください。
-    `;
-
-    const payload = {
-      contents,
-      systemInstruction: { parts: [{ text: systemPrompt }] }
-    };
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+    // --- ランダムな日時候補を生成する関数 ---
+    const generateRandomDates = () => {
+      const dates = [];
+      const now = new Date();
+      
+      // 今日から1〜4日後のランダムな日時を3つ生成
+      const offsets = [1, 2, 3].map(val => val + Math.floor(Math.random() * 2));
+      
+      offsets.forEach(offset => {
+        const d = new Date(now);
+        d.setDate(now.getDate() + offset);
+        d.setHours(Math.floor(Math.random() * 8) + 10); // 10時〜17時
+        const month = d.getMonth() + 1;
+        const date = d.getDate();
+        const day = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+        const hours = d.getHours();
+        dates.push(`${month}月${date}日(${day}) ${hours}:00`);
       });
-      
-      if (!response.ok) {
-          throw new Error("API request failed");
+      return dates;
+    };
+
+    // --- 初期モックデータ（画像の内容を再現） ---
+    const initialMessages = [
+      {
+        id: 1,
+        sender: 'user',
+        text: '約束していた家事の分担で、自分が疲れて後回しにしていたところに、由佳から言われて強く言い返してしまいました。\n反省して謝りたいのですが、気まずくてどうしたら良いかわからないです。',
+        time: '16:18',
+        avatar: 'https://i.pravatar.cc/150?img=11' // 雄太のアバター
+      },
+      {
+        id: 2,
+        sender: 'ai',
+        text: 'なるほど、それは大変ですね。でも、仲良くする気持ちがあれば、解決は早いと思います。\nまずは、家事分担でどのようなことがこれまで話し合ったのか振り返りつつ、謝り方について考えましょう。',
+        time: '16:19'
+      },
+      {
+        id: 3,
+        sender: 'ai',
+        type: 'agreement_card',
+        title: '家事に関する話し合ったこと',
+        content: '少し、由佳さんが家事を行うものの雄太さんも多くの家事を行う話でした。\n雄太さんは後でやろうと思っていたとのことですが、疲れている中ではありますが、「いつやるのか」を明確に伝えていれば問題は起きなかったかもしれません。',
+        time: '16:19',
+        users: [
+          'https://i.pravatar.cc/150?img=11', // 雄太
+          'https://i.pravatar.cc/150?img=5'  // 由佳
+        ]
+      },
+      {
+        id: 4,
+        sender: 'ai',
+        text: '次は謝り方について考えますか？\nそれともアドバイザーと面談をしますか？',
+        time: '16:19',
+        actions: [
+          { label: '謝り方を考える', action: 'apologize' },
+          { label: 'アドバイザーと面談', action: 'advisor' }
+        ]
       }
-      
-      const data = await response.json();
-      return data.candidates[0].content.parts[0].text;
-    } catch (error) {
-      console.error("Gemini API Error:", error);
-      return "すみません、少し考え込んでしまいました。もう一度送っていただけますか？";
-    }
-  };
+    ];
 
-  // メッセージ送信処理
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputText.trim() || isTyping) return;
+    function App() {
+      const [messages, setMessages] = useState(initialMessages);
+      const [inputText, setInputText] = useState('');
+      const [isTyping, setIsTyping] = useState(false);
+      const messagesEndRef = useRef(null);
 
-    const newText = inputText;
-    const newUserMsg = {
-      id: Date.now(),
-      sender: 'user',
-      text: newText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      avatar: 'https://i.pravatar.cc/150?img=11'
-    };
+      // 自動スクロール
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      };
 
-    const updatedMessages = [...messages, newUserMsg];
-    setMessages(updatedMessages);
-    setInputText('');
-    setIsTyping(true);
+      useEffect(() => {
+        scrollToBottom();
+      }, [messages, isTyping]);
 
-    // APIを呼び出して応答を取得
-    const aiResponseText = await generateAiResponse(newText, updatedMessages);
+      // Gemini API呼び出し処理
+      const generateAiResponse = async (userText, currentMessages) => {
+        const apiKey = "AIzaSyCpEthYkeZ0b3Uv83SzM9tN49PZLYvVr9Y"; // 実行環境で提供されるキーを使用します
+        
+        if (!apiKey) {
+           return "APIキーが設定されていません。コード内の apiKey の部分にキーを入力してください。";
+        }
+        
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-    const newAiMsg = {
-      id: Date.now() + 1,
-      sender: 'ai',
-      text: aiResponseText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      avatar: 'bot'
-    };
-    setMessages(prev => [...prev, newAiMsg]);
-    setIsTyping(false);
-  };
+        // これまでの会話履歴をAPI用のフォーマットに変換
+        const contents = currentMessages
+          .filter(m => m.text) // カード要素などは除外
+          .map(m => ({
+            role: m.sender === 'user' ? 'user' : 'model',
+            parts: [{ text: m.text }]
+          }));
 
-  // アクションボタンの処理
-  const handleActionClick = async (actionType, actionLabel) => {
-    setIsTyping(true);
-    let userActionText = '';
-    if (actionType === 'apologize') {
-      userActionText = '謝り方を考えたいです。';
-    } else if (actionType === 'advisor') {
-      userActionText = 'アドバイザーと面談したいです。';
-    } else if (actionType === 'schedule_advisor') {
-      userActionText = `${actionLabel}でお願いします。`;
-    }
+        // 今回のユーザーの入力を追加
+        contents.push({ role: 'user', parts: [{ text: userText }] });
 
-    const newUserMsg = {
-      id: Date.now(),
-      sender: 'user',
-      text: userActionText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      avatar: 'https://i.pravatar.cc/150?img=11'
-    };
-    
-    const updatedMessages = [...messages, newUserMsg];
-    setMessages(updatedMessages);
+        const systemPrompt = `
+          あなたは結婚相談所オーネットが提供する「パートナーシップのための関係性AIコーチング」のチャットボットです。
+          ユーザー（雄太さん）は妻（由佳さん）との関係やコミュニケーションについて悩みを相談してきます。
+          ユーザーの感情を受け止めて共感しつつ、客観的な視点を提供し、関係修復やより良いコミュニケーションのための具体的なアドバイスを行ってください。
+          トーンは親身で優しく、かつ論理的にお願いします。
+          スマートフォンアプリのチャットUIに表示されるため、1回の回答は長すぎず、会話のキャッチボールができる長さにしてください。
+        `;
 
-    // 面談予約のデモフロー（APIを使わず固定の応答とランダム日時を返す）
-    if (actionType === 'advisor') {
-      setTimeout(() => {
-        const randomDates = generateRandomDates();
-        const newAiMsg = {
-          id: Date.now() + 1,
-          sender: 'ai',
-          text: '承知いたしました。これまでの対話履歴をアドバイザーに共有し、より深い視点からサポートさせていただきます。\nまずは面談の希望日時を以下の候補からお選びください。',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          avatar: 'bot',
-          actions: randomDates.map(date => ({ label: date, action: 'schedule_advisor' }))
+        const payload = {
+          contents,
+          systemInstruction: { parts: [{ text: systemPrompt }] }
         };
-        setMessages(prev => [...prev, newAiMsg]);
-        setIsTyping(false);
-      }, 1500);
-      return;
-    } else if (actionType === 'schedule_advisor') {
-      setTimeout(() => {
+
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!response.ok) {
+              throw new Error("API request failed");
+          }
+          
+          const data = await response.json();
+          return data.candidates[0].content.parts[0].text;
+        } catch (error) {
+          console.error("Gemini API Error:", error);
+          return "すみません、少し考え込んでしまいました。もう一度送っていただけますか？";
+        }
+      };
+
+      // メッセージ送信処理
+      const handleSendMessage = async (e) => {
+        e.preventDefault();
+        if (!inputText.trim() || isTyping) return;
+
+        const newText = inputText;
+        const newUserMsg = {
+          id: Date.now(),
+          sender: 'user',
+          text: newText,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          avatar: 'https://i.pravatar.cc/150?img=11'
+        };
+
+        const updatedMessages = [...messages, newUserMsg];
+        setMessages(updatedMessages);
+        setInputText('');
+        setIsTyping(true);
+
+        // APIを呼び出して応答を取得
+        const aiResponseText = await generateAiResponse(newText, updatedMessages);
+
         const newAiMsg = {
           id: Date.now() + 1,
           sender: 'ai',
-          text: `ありがとうございます。${actionLabel}でアドバイザーとの面談予約を承りました。\n当日はお時間になりましたら、アプリ内のビデオ通話機能よりご参加ください。`,
+          text: aiResponseText,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           avatar: 'bot'
         };
         setMessages(prev => [...prev, newAiMsg]);
         setIsTyping(false);
-      }, 1500);
-      return;
-    }
+      };
 
-    // それ以外（謝り方を考える等）はAPIを呼び出して応答を取得
-    const aiResponseText = await generateAiResponse(userActionText, updatedMessages);
-    
-    const newAiMsg = {
-      id: Date.now() + 1,
-      sender: 'ai',
-      text: aiResponseText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      avatar: 'bot'
-    };
-    setMessages(prev => [...prev, newAiMsg]);
-    setIsTyping(false);
-  };
+      // アクションボタンの処理
+      const handleActionClick = async (actionType, actionLabel) => {
+        setIsTyping(true);
+        let userActionText = '';
+        if (actionType === 'apologize') {
+          userActionText = '謝り方を考えたいです。';
+        } else if (actionType === 'advisor') {
+          userActionText = 'アドバイザーと面談したいです。';
+        } else if (actionType === 'schedule_advisor') {
+          userActionText = `${actionLabel}でお願いします。`;
+        }
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 font-sans text-gray-800">
-      {/* スマホモックアップフレーム */}
-      <div className="w-full max-w-[400px] h-[800px] bg-[#f4f5f7] rounded-[40px] shadow-2xl overflow-hidden flex flex-col relative border-8 border-gray-900">
+        const newUserMsg = {
+          id: Date.now(),
+          sender: 'user',
+          text: userActionText,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          avatar: 'https://i.pravatar.cc/150?img=11'
+        };
         
-        {/* ステータスバー (疑似) */}
-        <div className="h-7 w-full bg-[#f4f5f7] flex justify-between items-center px-6 pt-2 text-[10px] font-medium text-black z-20">
-          <span>16:20</span>
-          <div className="flex gap-1.5 items-center">
-            <div className="w-4 h-3 bg-black rounded-sm relative overflow-hidden">
-               <div className="absolute left-0 bottom-0 w-3 h-2 bg-[#f4f5f7]"></div>
-            </div>
-            <div className="w-4 h-3 bg-black rounded-sm relative overflow-hidden flex items-end justify-center pb-[1px]">
-               <div className="w-3 h-1.5 bg-[#f4f5f7] rounded-sm"></div>
-            </div>
-            <div className="w-5 h-2.5 border border-black rounded-sm relative">
-               <div className="absolute left-[1px] top-[1px] bottom-[1px] w-[70%] bg-black"></div>
-               <div className="absolute right-[-3px] top-[2px] w-0.5 h-1 bg-black"></div>
-            </div>
-          </div>
-        </div>
+        const updatedMessages = [...messages, newUserMsg];
+        setMessages(updatedMessages);
 
-        {/* Dynamic Island (疑似) */}
-        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-[120px] h-7 bg-black rounded-full z-20"></div>
+        // 面談予約のデモフロー（APIを使わず固定の応答とランダム日時を返す）
+        if (actionType === 'advisor') {
+          setTimeout(() => {
+            const randomDates = generateRandomDates();
+            const newAiMsg = {
+              id: Date.now() + 1,
+              sender: 'ai',
+              text: '承知いたしました。これまでの対話履歴をアドバイザーに共有し、より深い視点からサポートさせていただきます。\nまずは面談の希望日時を以下の候補からお選びください。',
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              avatar: 'bot',
+              actions: randomDates.map(date => ({ label: date, action: 'schedule_advisor' }))
+            };
+            setMessages(prev => [...prev, newAiMsg]);
+            setIsTyping(false);
+          }, 1500);
+          return;
+        } else if (actionType === 'schedule_advisor') {
+          setTimeout(() => {
+            const newAiMsg = {
+              id: Date.now() + 1,
+              sender: 'ai',
+              text: `ありがとうございます。${actionLabel}でアドバイザーとの面談予約を承りました。\n当日はお時間になりましたら、アプリ内のビデオ通話機能よりご参加ください。`,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              avatar: 'bot'
+            };
+            setMessages(prev => [...prev, newAiMsg]);
+            setIsTyping(false);
+          }, 1500);
+          return;
+        }
 
-        {/* ヘッダー */}
-        <header className="bg-[#f4f5f7] px-4 pt-6 pb-2 flex items-center justify-between z-10 relative">
-          <button className="p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-full transition-colors">
-            <ChevronLeft size={28} strokeWidth={2.5} />
-          </button>
-          <h1 className="text-[17px] font-bold tracking-tight text-gray-900">AIコーチング</h1>
-          <button className="p-2 -mr-2 text-gray-600 hover:bg-gray-200 rounded-full transition-colors">
-            <Mic size={24} />
-          </button>
-        </header>
+        // それ以外（謝り方を考える等）はAPIを呼び出して応答を取得
+        const aiResponseText = await generateAiResponse(userActionText, updatedMessages);
+        
+        const newAiMsg = {
+          id: Date.now() + 1,
+          sender: 'ai',
+          text: aiResponseText,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          avatar: 'bot'
+        };
+        setMessages(prev => [...prev, newAiMsg]);
+        setIsTyping(false);
+      };
 
-        {/* メインコンテンツエリア */}
-        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-6 custom-scrollbar relative z-0">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex flex-col w-full ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
-              
-              {/* ユーザーメッセージ (アバターと吹き出し) */}
-              {msg.sender === 'user' && (
-                <div className="flex items-end justify-end w-full gap-2">
-                  <div className="max-w-[75%] bg-white rounded-[22px] rounded-br-sm p-4 text-[14px] leading-[1.6] shadow-sm border border-gray-100 text-gray-800 tracking-wide whitespace-pre-wrap">
-                    {msg.text}
-                  </div>
-                  <img src={msg.avatar} alt="User" className="w-8 h-8 rounded-full object-cover shadow-sm mb-1" />
+      return (
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 font-sans text-gray-800">
+          {/* スマホモックアップフレーム */}
+          <div className="w-full max-w-[400px] h-[800px] bg-[#f4f5f7] rounded-[40px] shadow-2xl overflow-hidden flex flex-col relative border-8 border-gray-900">
+            
+            {/* ステータスバー (疑似) */}
+            <div className="h-7 w-full bg-[#f4f5f7] flex justify-between items-center px-6 pt-2 text-[10px] font-medium text-black z-20">
+              <span>16:20</span>
+              <div className="flex gap-1.5 items-center">
+                <div className="w-4 h-3 bg-black rounded-sm relative overflow-hidden">
+                   <div className="absolute left-0 bottom-0 w-3 h-2 bg-[#f4f5f7]"></div>
                 </div>
-              )}
+                <div className="w-4 h-3 bg-black rounded-sm relative overflow-hidden flex items-end justify-center pb-[1px]">
+                   <div className="w-3 h-1.5 bg-[#f4f5f7] rounded-sm"></div>
+                </div>
+                <div className="w-5 h-2.5 border border-black rounded-sm relative">
+                   <div className="absolute left-[1px] top-[1px] bottom-[1px] w-[70%] bg-black"></div>
+                   <div className="absolute right-[-3px] top-[2px] w-0.5 h-1 bg-black"></div>
+                </div>
+              </div>
+            </div>
 
-              {/* AIメッセージ (アバターなし、少しインデント、右下にアイコン) */}
-              {msg.sender === 'ai' && !msg.type && (
+            {/* Dynamic Island (疑似) */}
+            <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-[120px] h-7 bg-black rounded-full z-20"></div>
+
+            {/* ヘッダー */}
+            <header className="bg-[#f4f5f7] px-4 pt-6 pb-2 flex items-center justify-between z-10 relative">
+              <button className="p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-full transition-colors">
+                <ChevronLeft size={28} strokeWidth={2.5} />
+              </button>
+              <h1 className="text-[17px] font-bold tracking-tight text-gray-900">AIコーチング</h1>
+              <button className="p-2 -mr-2 text-gray-600 hover:bg-gray-200 rounded-full transition-colors">
+                <Mic size={24} />
+              </button>
+            </header>
+
+            {/* メインコンテンツエリア */}
+            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-6 custom-scrollbar relative z-0">
+              {messages.map((msg) => (
+                <div key={msg.id} className={`flex flex-col w-full ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                  
+                  {/* ユーザーメッセージ (アバターと吹き出し) */}
+                  {msg.sender === 'user' && (
+                    <div className="flex items-end justify-end w-full gap-2">
+                      <div className="max-w-[75%] bg-white rounded-[22px] rounded-br-sm p-4 text-[14px] leading-[1.6] shadow-sm border border-gray-100 text-gray-800 tracking-wide whitespace-pre-wrap">
+                        {msg.text}
+                      </div>
+                      <img src={msg.avatar} alt="User" className="w-8 h-8 rounded-full object-cover shadow-sm mb-1" />
+                    </div>
+                  )}
+
+                  {/* AIメッセージ (アバターなし、少しインデント、右下にアイコン) */}
+                  {msg.sender === 'ai' && !msg.type && (
+                    <div className="max-w-[85%] ml-[36px] relative">
+                      <div className="bg-white rounded-[22px] rounded-tl-sm p-4 text-[14px] leading-[1.6] shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100 text-gray-800 tracking-wide whitespace-pre-wrap">
+                        {msg.text}
+                      </div>
+                      {/* AIアイコン */}
+                      <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-white rounded-full shadow-sm border border-gray-100 flex items-center justify-center">
+                        <Bot size={16} className="text-gray-400" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 合意事項カード */}
+                  {msg.type === 'agreement_card' && (
+                    <div className="w-[90%] mx-auto bg-white rounded-[24px] p-5 shadow-[0_4px_15px_rgba(0,0,0,0.04)] border border-gray-100 mt-2 mb-2 relative">
+                      <h3 className="text-[15px] font-bold text-center text-gray-900 mb-5 tracking-tight">
+                        家事に関する話し合ったこと
+                      </h3>
+                      
+                      {/* アバターコネクション */}
+                      <div className="flex justify-center items-center gap-0 mb-5 relative">
+                        <div className="absolute w-[60px] h-[2px] bg-orange-400 z-0"></div>
+                        <img src={msg.users[0]} alt="Yuta" className="w-[38px] h-[38px] rounded-full border-2 border-white shadow-md z-10 relative -left-6 object-cover bg-white" />
+                        <img src={msg.users[1]} alt="Yuka" className="w-[38px] h-[38px] rounded-full border-2 border-white shadow-md z-10 relative -right-6 object-cover bg-white" />
+                      </div>
+                      
+                      <p className="text-[13px] text-gray-600 leading-[1.7] mb-5 tracking-wide whitespace-pre-wrap">
+                        {msg.content}
+                      </p>
+                      
+                      <div className="flex justify-center">
+                        <button className="text-[12px] font-medium text-gray-600 border border-gray-200 px-5 py-2 rounded-full hover:bg-gray-50 transition-colors shadow-sm">
+                          詳しくみる {'>'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* アクションボタン群 */}
+                  {msg.actions && (
+                     <div className="flex flex-col gap-2 mt-3 w-[85%] ml-[36px]">
+                       {msg.actions.map(action => (
+                         <button 
+                           key={action.label}
+                           onClick={() => handleActionClick(action.action, action.label)}
+                           className="w-full bg-white border border-gray-200 text-gray-700 text-[14px] font-medium py-3 px-4 rounded-[16px] shadow-sm hover:bg-gray-50 transition-colors text-center"
+                         >
+                           {action.label}
+                         </button>
+                       ))}
+                     </div>
+                  )}
+
+                  <span className={`text-[10px] text-gray-400 mt-1 px-1 ${msg.sender === 'user' ? 'mr-10' : 'ml-[36px]'}`}>
+                    {msg.time}
+                  </span>
+                </div>
+              ))}
+
+              {/* タイピングインジケーター */}
+              {isTyping && (
                 <div className="max-w-[85%] ml-[36px] relative">
-                  <div className="bg-white rounded-[22px] rounded-tl-sm p-4 text-[14px] leading-[1.6] shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100 text-gray-800 tracking-wide whitespace-pre-wrap">
-                    {msg.text}
+                  <div className="bg-white rounded-[22px] rounded-tl-sm py-4 px-5 w-fit shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100 flex items-center gap-1.5">
+                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
-                  {/* AIアイコン */}
                   <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-white rounded-full shadow-sm border border-gray-100 flex items-center justify-center">
                     <Bot size={16} className="text-gray-400" />
                   </div>
                 </div>
               )}
-
-              {/* 合意事項カード */}
-              {msg.type === 'agreement_card' && (
-                <div className="w-[90%] mx-auto bg-white rounded-[24px] p-5 shadow-[0_4px_15px_rgba(0,0,0,0.04)] border border-gray-100 mt-2 mb-2 relative">
-                  <h3 className="text-[15px] font-bold text-center text-gray-900 mb-5 tracking-tight">
-                    家事に関する話し合ったこと
-                  </h3>
-                  
-                  {/* アバターコネクション */}
-                  <div className="flex justify-center items-center gap-0 mb-5 relative">
-                    <div className="absolute w-[60px] h-[2px] bg-orange-400 z-0"></div>
-                    <img src={msg.users[0]} alt="Yuta" className="w-[38px] h-[38px] rounded-full border-2 border-white shadow-md z-10 relative -left-6 object-cover bg-white" />
-                    <img src={msg.users[1]} alt="Yuka" className="w-[38px] h-[38px] rounded-full border-2 border-white shadow-md z-10 relative -right-6 object-cover bg-white" />
-                  </div>
-                  
-                  <p className="text-[13px] text-gray-600 leading-[1.7] mb-5 tracking-wide whitespace-pre-wrap">
-                    {msg.content}
-                  </p>
-                  
-                  <div className="flex justify-center">
-                    <button className="text-[12px] font-medium text-gray-600 border border-gray-200 px-5 py-2 rounded-full hover:bg-gray-50 transition-colors shadow-sm">
-                      詳しくみる {'>'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* アクションボタン群 */}
-              {msg.actions && (
-                 <div className="flex flex-col gap-2 mt-3 w-[85%] ml-[36px]">
-                   {msg.actions.map(action => (
-                     <button 
-                       key={action.label}
-                       onClick={() => handleActionClick(action.action, action.label)}
-                       className="w-full bg-white border border-gray-200 text-gray-700 text-[14px] font-medium py-3 px-4 rounded-[16px] shadow-sm hover:bg-gray-50 transition-colors text-center"
-                     >
-                       {action.label}
-                     </button>
-                   ))}
-                 </div>
-              )}
-
-              <span className={`text-[10px] text-gray-400 mt-1 px-1 ${msg.sender === 'user' ? 'mr-10' : 'ml-[36px]'}`}>
-                {msg.time}
-              </span>
+              <div ref={messagesEndRef} className="h-4" />
             </div>
-          ))}
 
-          {/* タイピングインジケーター */}
-          {isTyping && (
-            <div className="max-w-[85%] ml-[36px] relative">
-              <div className="bg-white rounded-[22px] rounded-tl-sm py-4 px-5 w-fit shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100 flex items-center gap-1.5">
-                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
-              <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-white rounded-full shadow-sm border border-gray-100 flex items-center justify-center">
-                <Bot size={16} className="text-gray-400" />
-              </div>
+            {/* 入力エリア */}
+            <div className="bg-[#f4f5f7] px-4 py-3 pb-8 z-10 border-t border-gray-200/60">
+              <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-white rounded-full pl-4 pr-1.5 py-1.5 shadow-sm border border-gray-200">
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="メッセージを入力"
+                  className="flex-1 bg-transparent text-[15px] py-1.5 px-2 focus:outline-none text-gray-800"
+                  disabled={isTyping}
+                />
+                <button 
+                  type="submit" 
+                  disabled={!inputText.trim() || isTyping}
+                  className={`w-[34px] h-[34px] rounded-full flex items-center justify-center transition-colors ${
+                    inputText.trim() && !isTyping ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'
+                  }`}
+                >
+                  <ArrowUp size={18} strokeWidth={2.5} />
+                </button>
+              </form>
             </div>
-          )}
-          <div ref={messagesEndRef} className="h-4" />
+            
+            {/* ホームバー */}
+            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-[130px] h-1.5 bg-black rounded-full z-20"></div>
+          </div>
         </div>
+      );
+    }
 
-        {/* 入力エリア */}
-        <div className="bg-[#f4f5f7] px-4 py-3 pb-8 z-10 border-t border-gray-200/60">
-          <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-white rounded-full pl-4 pr-1.5 py-1.5 shadow-sm border border-gray-200">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="メッセージを入力"
-              className="flex-1 bg-transparent text-[15px] py-1.5 px-2 focus:outline-none text-gray-800"
-              disabled={isTyping}
-            />
-            <button 
-              type="submit" 
-              disabled={!inputText.trim() || isTyping}
-              className={`w-[34px] h-[34px] rounded-full flex items-center justify-center transition-colors ${
-                inputText.trim() && !isTyping ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'
-              }`}
-            >
-              <ArrowUp size={18} strokeWidth={2.5} />
-            </button>
-          </form>
-        </div>
-        
-        {/* ホームバー */}
-        <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-[130px] h-1.5 bg-black rounded-full z-20"></div>
-      </div>
-
-      <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 0px;
-          background: transparent;
-        }
-      `}} />
-    </div>
-  );
-}
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
