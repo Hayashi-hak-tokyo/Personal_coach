@@ -221,6 +221,26 @@
         setInputText('');
         setIsTyping(true);
 
+        // 面談に関するキーワードが含まれているかチェック
+        const isRequestingAdvisor = newText.includes('面談') || newText.includes('相談') || newText.includes('アドバイザー');
+
+        if (isRequestingAdvisor) {
+          setTimeout(() => {
+            const randomDates = generateRandomDates();
+            const newAiMsg = {
+              id: Date.now() + 1,
+              sender: 'ai',
+              text: '承知いたしました。これまでの対話履歴をアドバイザーに共有し、より深い視点からサポートさせていただきます。\nまずは面談の希望日時を以下の候補からお選びください。',
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              avatar: 'bot',
+              actions: randomDates.map(date => ({ label: date, action: 'schedule_advisor' }))
+            };
+            setMessages(prev => [...prev, newAiMsg]);
+            setIsTyping(false);
+          }, 1500);
+          return;
+        }
+
         const aiResponseText = await generateAiResponse(newText, updatedMessages);
 
         const newAiMsg = {
