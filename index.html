@@ -221,8 +221,8 @@
         setInputText('');
         setIsTyping(true);
 
-        // 面談に関するキーワードが含まれているかチェック
-        const isRequestingAdvisor = newText.includes('面談') || newText.includes('相談') || newText.includes('アドバイザー');
+        // 面談に関するキーワードが含まれているかチェック (相談を除外)
+        const isRequestingAdvisor = newText.includes('面談') || newText.includes('アドバイザー');
 
         if (isRequestingAdvisor) {
           setTimeout(() => {
@@ -263,6 +263,8 @@
           userActionText = 'アドバイザーと面談したいです。';
         } else if (actionType === 'schedule_advisor') {
           userActionText = `${actionLabel}でお願いします。`;
+        } else if (actionType === 'details') {
+          userActionText = 'これまでの話し合いの詳細を教えてください。';
         }
 
         const newUserMsg = {
@@ -297,6 +299,19 @@
               id: Date.now() + 1,
               sender: 'ai',
               text: `ありがとうございます。${actionLabel}でアドバイザーとの面談予約を承りました。\n当日はお時間になりましたら、アプリ内のビデオ通話機能よりご参加ください。`,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              avatar: 'bot'
+            };
+            setMessages(prev => [...prev, newAiMsg]);
+            setIsTyping(false);
+          }, 1500);
+          return;
+        } else if (actionType === 'details') {
+          setTimeout(() => {
+            const newAiMsg = {
+              id: Date.now() + 1,
+              sender: 'ai',
+              text: 'はい、これまでの話し合いの記録はこちらです。\n\n【家事分担の基本ルール（昨年10月合意）】\n・料理と買い出しは、基本的に帰宅が早い花子さんが担当する。\n・太郎さんは、食後の食器洗い、ゴミ出し、週末の掃除機掛けを担当する。\n・お互いに疲れている時や急な残業の時は、無理せず相手に「今日はお願い」と早めにLINEで申告する。\n\n今回は太郎さんが疲れていて後回しにしていたとのことですが、花子さんへの「後でやるね」という事前の一言が抜けていたことがすれ違いの原因かもしれませんね。',
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               avatar: 'bot'
             };
@@ -392,7 +407,10 @@
                       </p>
                       
                       <div className="flex justify-center">
-                        <button className="text-[12px] font-medium text-gray-600 border border-gray-200 px-5 py-2 rounded-full hover:bg-gray-50 transition-colors shadow-sm">
+                        <button 
+                          onClick={() => handleActionClick('details', '詳しくみる')}
+                          className="text-[12px] font-medium text-gray-600 border border-gray-200 px-5 py-2 rounded-full hover:bg-gray-50 transition-colors shadow-sm"
+                        >
                           詳しくみる {'>'}
                         </button>
                       </div>
